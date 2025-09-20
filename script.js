@@ -1,6 +1,8 @@
 // --- THREE.js SETUP ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xc7e9ff);
+    // Bright, clear blue sky
+    scene.background = new THREE.Color(0x66c6ff);
+
     const camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 2000);
     camera.position.set(0, 2.2, 10);
 
@@ -8,46 +10,79 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // LIGHTS
-    scene.add(new THREE.HemisphereLight(0xf9f9ff, 0x25872d, 0.54));
-    var dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(15,34,12); scene.add(dirLight);
+    // Sunlight and ambient
+    scene.add(new THREE.HemisphereLight(0xe6faff, 0xcfecff, 0.55));
+    var dirLight = new THREE.DirectionalLight(0xfffaf3, 1.1);
+    dirLight.position.set(40,100,42);
+    scene.add(dirLight);
 
-    // BIGGER GROUND
+    // LAND
     const LAND_SIZE = 200;
     const groundGeo = new THREE.BoxGeometry(LAND_SIZE, 1, LAND_SIZE);
-    const groundMat = new THREE.MeshPhongMaterial({color: 0x429749});
+    const groundMat = new THREE.MeshPhongMaterial({color: 0x7bd672});
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.position.y = -1.5;
     scene.add(ground);
 
-    // --- SCIENTIST CHARACTER (capsule, football-head, little "armless" limbs) ---
+    // SCIENTIST PLAYER: geometric, colorful
     const scientist = new THREE.Group();
-    scene.add(scientist);
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.5,14), 
-                               new THREE.MeshPhongMaterial({color: 0xf8e16c}));
-    body.position.y = 1.05;
-    scientist.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.6,18,14), 
-                               new THREE.MeshPhongMaterial({color: 0xf9ede4}));
-    head.scale.set(1, 1.25, 1);
-    head.position.y = 2.13;
-    scientist.add(head);
-    const armMat = new THREE.MeshPhongMaterial({color: 0xe0d067});
-    const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.9,8), armMat);
-    const armR = armL.clone();
-    armL.position.set(-0.65,1.1,0); armL.rotation.z = Math.PI/4;
-    armR.position.set( 0.65,1.1,0); armR.rotation.z = -Math.PI/4;
-    scientist.add(armL,armR);
-    const legMat = new THREE.MeshPhongMaterial({color: 0xaf952a});
-    const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.20,0.20,0.49,8), legMat);
-    const legR = legL.clone();
-    legL.position.set(-0.25,0.25,0);
-    legR.position.set(0.25,0.25,0);
-    scientist.add(legL, legR);
-    scientist.position.set(0,0,0);
+    function buildScientist() {
+      const shoeL = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.09, 14, 18, Math.PI), new THREE.MeshPhongMaterial({color:"#71789C"}));
+      shoeL.position.set(-0.22, 0.11,-0.06); shoeL.rotation.x=Math.PI/2;
+      const shoeR = shoeL.clone(); shoeR.position.x=0.22; scientist.add(shoeL,shoeR);
 
-    // --- SAMPLE DEFINITIONS ---
+      const legMat = new THREE.MeshPhongMaterial({color: "#DCD9DF"});
+      const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.42,8), legMat); legL.position.set(-0.22,0.37,0);
+      const legR = legL.clone(); legR.position.x=0.22; scientist.add(legL, legR);
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.0, 0.42), new THREE.MeshPhongMaterial({color: "#ffbc72"})); body.position.y = 0.97; scientist.add(body);
+      const tie = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.22,7), new THREE.MeshPhongMaterial({color: "#3fa7f5"})); tie.position.set(0,1.35,0.21); scientist.add(tie);
+
+      const should = new THREE.Mesh(new THREE.SphereGeometry(0.36,12,8), new THREE.MeshPhongMaterial({color:"#ffc6b9"}));
+      should.scale.set(1.13,0.51,0.67); should.position.set(0,1.5,0); scientist.add(should);
+
+      const armMat = new THREE.MeshPhongMaterial({color: "#ffe167"});
+      const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.52, 8, 14), armMat);
+      armL.position.set(-0.46,1.26,0); armL.rotation.z = Math.PI/10;
+      const armR = armL.clone(); armR.position.x = 0.46; armR.rotation.z=-Math.PI/10; scientist.add(armL, armR);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.36,18,16), new THREE.MeshPhongMaterial({color: "#ffedd3"})); head.position.y = 1.98; scientist.add(head);
+
+      const hatB = new THREE.Mesh(new THREE.CylinderGeometry(0.37,0.37,0.08,18), new THREE.MeshPhongMaterial({color:'#35477d'})); hatB.position.set(0,2.22,0);
+      const hatT = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.25,15), new THREE.MeshPhongMaterial({color:'#1a2238'})); hatT.position.set(0,2.36,0);
+      scientist.add(hatB, hatT);
+    }
+    buildScientist();
+    scientist.position.set(0,0,0);
+    scene.add(scientist);
+
+    // --- WHITE OPAQUE CLOUDS ---
+    function addCloud(x, z, y=31, n=5) {
+      const cloud = new THREE.Group();
+      for(let i=0;i<n;++i){
+        const sph = new THREE.Mesh(
+          new THREE.SphereGeometry(2.1 + Math.random()*1.7, 20,16),
+          new THREE.MeshPhongMaterial({
+            color:0xffffff,
+            transparent: false,
+            opacity: 1,
+            shininess: 20
+          })
+        );
+        sph.position.x = (Math.random()-0.5)*3.8;
+        sph.position.z = (Math.random()-0.5)*2.9;
+        sph.position.y = (Math.random()-0.6)*2.7;
+        cloud.add(sph);
+      }
+      cloud.position.set(x,y,z);
+      scene.add(cloud);
+    }
+    [
+      [10, 23], [-20, 40], [-60, -15], [70, -70],
+      [-40, 100], [60, 100], [-100, -100]
+    ].forEach(([x,z])=>addCloud(x,z,31 + Math.random()*8, 4 + Math.floor(Math.random()*3)));
+
+    // --- SAMPLES (unchanged, still fun and randomized) ---
     function makeFlower(x,z) {
       const group = new THREE.Group();
       const stem = new THREE.Mesh(
@@ -69,7 +104,7 @@
     function makeRock(x,z) {
       const mesh = new THREE.Mesh(
         new THREE.IcosahedronGeometry(0.78,0),
-        new THREE.MeshPhongMaterial({ color: 0xcfcfcf, flatShading:true}));
+        new THREE.MeshPhongMaterial({ color: 0xaea7cc, flatShading:true}));
       mesh.rotation.set(0.2,1,0);
       mesh.userData = {label: "Quartz Rock", collected:false};
       mesh.position.set(x,0.46,z);
@@ -78,7 +113,7 @@
     function makeMoss(x,z) {
       const mesh = new THREE.Mesh(
         new THREE.SphereGeometry(0.66, 14, 8),
-        new THREE.MeshPhongMaterial({color: 0x4cc386}));
+        new THREE.MeshPhongMaterial({color: 0x77edd4}));
       mesh.scale.y = 0.28;
       mesh.userData = {label: "Moss Patch", collected:false};
       mesh.position.set(x,0.18,z);
@@ -87,7 +122,7 @@
     function makeWaterSample(x,z) {
       const mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(0.22,0.23,0.55,14),
-        new THREE.MeshPhongMaterial({color: 0x77aeff, transparent:true, opacity: 0.56}));
+        new THREE.MeshPhongMaterial({color: 0x6dcfff, transparent:true, opacity: 0.66}));
       mesh.userData = {label:"Water Sample",collected:false};
       mesh.position.set(x,0.36,z);
       return mesh;
@@ -95,7 +130,7 @@
     function makeSoilCore(x,z) {
       const mesh = new THREE.Mesh(
         new THREE.CylinderGeometry(0.34,0.36,0.9,10),
-        new THREE.MeshPhongMaterial({color: 0x8f6e45}));
+        new THREE.MeshPhongMaterial({color: 0xc99e6a}));
       mesh.userData = {label:"Soil Core",collected:false};
       mesh.position.set(x,0.45,z);
       return mesh;
@@ -104,7 +139,7 @@
       const group = new THREE.Group();
       const cone = new THREE.Mesh(
         new THREE.ConeGeometry(0.32, 0.8, 12),
-        new THREE.MeshPhongMaterial({ color: 0x91672c }));
+        new THREE.MeshPhongMaterial({ color: 0xbd6856 }));
       cone.position.y = 0.4; group.add(cone);
       group.userData = {label: "Tree Cone", collected: false};
       group.position.set(x, 0.05, z);
@@ -113,7 +148,7 @@
     function makeShell(x, z) {
       const mesh = new THREE.Mesh(
         new THREE.TorusGeometry(0.36, 0.14, 12, 28, Math.PI),
-        new THREE.MeshPhongMaterial({ color: 0xe9e6b0 }));
+        new THREE.MeshPhongMaterial({ color: 0xf7fad0 }));
       mesh.rotation.x = Math.PI/2;
       mesh.userData = {label: "Shell", collected: false};
       mesh.position.set(x,0.32,z);
@@ -122,7 +157,7 @@
     function makeFern(x, z) {
       const mesh = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.16, 0.69, 4, 8),
-        new THREE.MeshPhongMaterial({ color: 0x3c9f5b }));
+        new THREE.MeshPhongMaterial({ color: 0x70e360 }));
       mesh.rotation.x = Math.PI/5;
       mesh.userData = {label: "Fern", collected: false};
       mesh.position.set(x,0.55,z);
@@ -131,12 +166,11 @@
     function makeLeafFossil(x, z) {
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(0.74, 0.08, 0.5),
-        new THREE.MeshPhongMaterial({ color: 0xccc59a }));
+        new THREE.MeshPhongMaterial({ color: 0xd4cbaa }));
       mesh.userData = {label: "Leaf Fossil", collected: false};
       mesh.position.set(x,0.08,z);
       return mesh;
     }
-
     // Types and randomization
     const collectibleTypes = [
       {count: 2, maker: makeRock},
@@ -149,7 +183,6 @@
       {count: 2, maker: makeFern},
       {count: 2, maker: makeLeafFossil}
     ];
-
     // Helper: random position within a ring (minRadius,maxRadius) from (0,0)
     function randomPosition(minR, maxR) {
       const rad = minR + Math.random() * (maxR - minR);
@@ -172,9 +205,9 @@
     for (const s of samples) scene.add(s);
 
     // --- CAMERA + POINTER LOCK ---
-    let pitchObject = new THREE.Object3D(); // up/down
+    let pitchObject = new THREE.Object3D();
     pitchObject.add(camera);
-    let yawObject = new THREE.Object3D(); // left/right
+    let yawObject = new THREE.Object3D();
     yawObject.position.y = 1.57;
     yawObject.add(pitchObject);
     scene.add(yawObject);
@@ -193,7 +226,6 @@
       pitchObject.rotation.x -= event.movementY * rotationSpeed;
       pitchObject.rotation.x = Math.max( -Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
     }
-
     document.body.addEventListener('click', function(){
       if(!isLocked) renderer.domElement.requestPointerLock();
     });
@@ -202,12 +234,11 @@
       document.getElementById('lock-instruct').style.display = isLocked?"none":"block";
     });
     renderer.domElement.addEventListener('mousemove', onMouseMove);
-
     if (!isLocked) document.getElementById('lock-instruct').style.display = 'block';
 
-    let keys = {};
-    document.addEventListener("keydown", e => keys[e.code]=true);
-    document.addEventListener("keyup",   e => keys[e.code]=false);
+    let keys = {}, jumpKeyDown = false;
+    document.addEventListener("keydown", e => { keys[e.code]=true; if(e.code==="Space") jumpKeyDown=true; });
+    document.addEventListener("keyup",   e => { keys[e.code]=false; if(e.code==="Space") jumpKeyDown=false; });
 
     window.addEventListener('resize', ()=>{
       camera.aspect=window.innerWidth/window.innerHeight;
@@ -225,11 +256,14 @@
     }
     updateLog();
 
+    // --- PHYSICS ---
+    let vy = 0, inAir = false, GRAVITY = 0.016;
+
     function animate() {
       requestAnimationFrame(animate);
 
       // --- PLAYER MOVEMENT (WASD, relative to camera yaw) ---
-      let speed = 0.15;
+      let speed = 0.15, jumpHeight = 0.31;
       let move = new THREE.Vector3();
       if(keys["KeyW"]) move.z -= 1;
       if(keys["KeyS"]) move.z += 1;
@@ -248,16 +282,39 @@
         let next = scientist.position.clone().add(moveDir);
         const limit = LAND_SIZE/2-1.5;
         if(Math.abs(next.x) < limit && Math.abs(next.z) < limit) {
-          scientist.position.copy(next);
-          yawObject.position.set(scientist.position.x, 1.57, scientist.position.z);
+          scientist.position.x = next.x;
+          scientist.position.z = next.z;
+          yawObject.position.x = next.x;
+          yawObject.position.z = next.z;
         }
       }
+
       scientist.rotation.y = yawObject.rotation.y;
+
+      // --- JUMPING + GRAVITY ---
+      if(!inAir && jumpKeyDown) {
+        vy = 0.20;
+        inAir = true;
+      }
+      if(inAir) {
+        vy -= GRAVITY;
+        scientist.position.y += vy;
+        yawObject.position.y = scientist.position.y + 1.57;
+        // Land on ground
+        if(scientist.position.y <= 0){
+          scientist.position.y = 0;
+          yawObject.position.y = 1.57;
+          inAir = false;
+          vy = 0;
+        }
+      }
 
       // --- SAMPLE INTERACTION ---
       for(let m of samples){
+        const sY = (m.position ? m.position.y : 0) + 0.14;
+        const distance = scientist.position.clone().setY(0).distanceTo(m.position ? m.position.clone().setY(0) : new THREE.Vector3());
         if(!m.userData.collected && 
-          scientist.position.distanceTo(m.position) < 1.65) {
+          (distance < 1.8) && Math.abs((scientist.position.y||0) - (sY)) < 1.1 ) {
           m.children?.forEach(p=>p.material.emissive?.setHex(0xffea8a));
           m.material?.emissive?.setHex(0xffea8a);
           if(keys["KeyE"]){
@@ -271,6 +328,7 @@
           m.material?.emissive?.setHex(0x0);
         }
       }
+
       camera.position.set(0, 2.2, 10);
       camera.updateProjectionMatrix();
       renderer.render(scene, camera);
