@@ -1,6 +1,6 @@
 # Field Scientist Sandbox 3D Game
 
-<img src="https://res.cloudinary.com/dccrbxfro/image/upload/v1758355278/Screenshot_20-9-2025_133032__le6rfw.jpg" height=auto width=auto>
+<img src="https://res.cloudinary.com/dccrbxfro/image/upload/v1758381634/Screenshot_20-9-2025_204921_science-web-game.vercel.app_sq8yy4.jpg" height=auto width=auto>
 
 ## Overview
 
