@@ -1,0 +1,20 @@
+body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+      #log {
+        position: absolute; top: 20px; left: 20px;
+        background: rgba(255,255,255,0.82); 
+        padding: 12px 18px; border-radius: 8px;
+        max-width: 270px; min-width: 180px;
+        color: #142e17; font-size: 15px; z-index: 8;
+        box-shadow: 0 2px 18px #0005;
+      }
+      #instructions {
+        position: absolute; bottom: 18px; left: 20px;
+        background: rgba(40,40,40,0.92); color: #d8ffd8;
+        padding: 10px 15px; border-radius: 8px; font-size: 13px; z-index: 8;
+      }
+      #lock-instruct {
+        position: absolute; left: 50%; top: 30%; transform: translate(-50%,-50%);
+        background: #222e; color: #eaf6e6; padding: 28px 34px; border-radius: 16px;
+        font-size:18px; display:none; z-index:10;
+      }
+      
