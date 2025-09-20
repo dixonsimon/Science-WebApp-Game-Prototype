@@ -293,7 +293,7 @@
 
       // --- JUMPING + GRAVITY ---
       if(!inAir && jumpKeyDown) {
-        vy = 0.20;
+        vy = 0.33;
         inAir = true;
       }
       if(inAir) {
