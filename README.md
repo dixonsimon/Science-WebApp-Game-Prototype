@@ -22,7 +22,7 @@ This project was developed as a prototype for gamified environmental education, 
 ## How to Play
 
 1. **Download or Clone the Repository**:
-* git clone https://github.com/yourusername/field-scientist-sandbox.git
+* `git clone https://github.com/yourusername/field-scientist-sandbox.git`
 
 2. **Run the Game**:
 - Open `index.html` (or the main HTML file) in a modern web browser (e.g., Chrome, Firefox).
