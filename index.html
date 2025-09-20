@@ -1,23 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <link rel="stylesheet" href="style.css" />
-    <title>Field Scientist Sandbox 3D Game</title>
-    <meta charset="utf-8" />
-  </head>
-  <body>
-    <div id="log">
-      <b>Research Log</b>
-      <ul id="samples"></ul>
-    </div>
-    <div id="instructions">
-      <b>How to play:</b><br>
-      <b>Click</b> to Lock Mouse & Look Around<br>
-      Move: <b>W A S D</b> &nbsp; Collect Sample: <b>E</b>
-    </div>
-    <div id="lock-instruct">Click to look around</div>
-
-    <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
-    <script src="script.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <title>Scientist Sandbox</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+</head>
+<body>
+<div id="log"><b>Research Log</b><ul id="samples"></ul></div>
+<div id="score">Samples: 0</div>
+<div id="fact"></div>
+<div id="pointer"></div>
+<div id="lock-instruct">Click anywhere to lock and play!</div>
+<div id="stamina"><span class="bar"></span></div>
+<div id="compass"><div id="compass-arrow"></div></div>
+<div id="instructions"><b>How to Play:</b><br>WASD - Move<br>Shift - Run (uses stamina)<br>Space - Jump<br>Mouse - Look around<br>E - Collect samples<br>Collect all samples!</div>
+<script src="script.js"></script>
+</body>
 </html>

@@ -1,336 +1,228 @@
-// --- THREE.js SETUP ---
-    const scene = new THREE.Scene();
-    // Bright, clear blue sky
-    scene.background = new THREE.Color(0x66c6ff);
+// --- Inline Perlin Noise Function (no external lib needed) ---
+function PerlinNoise(seed = 0) {
+  const p = new Uint8Array(512);
+  const permutation = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+  for (let i=0; i < 256 ; i++) p[256+i] = p[i] = permutation[i];
+  this.noise2D = function(x, y) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+    x -= Math.floor(x); y -= Math.floor(y);
+    const u = fade(x), v = fade(y);
+    const a = p[X] + Y, b = p[X + 1] + Y;
+    return lerp(v, lerp(u, grad(p[a], x, y), grad(p[b], x-1, y)), lerp(u, grad(p[a + 1], x, y-1), grad(p[b + 1], x - 1, y-1)));
+  };
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function lerp(t, a, b) { return a + t * (b - a); }
+  function grad(hash, x, y) {
+    const h = hash & 3;
+    return (h === 0 ? x + y : (h === 1 ? -x + y : (h === 2 ? x - y : -x - y)));
+  }
+}
 
-    const camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 2.2, 10);
+// --- Game Code ---
+const facts={"Wildflower":["Wildflowers help pollinators survive!"],"Quartz Rock":["Quartz is a very common mineral."],"Water Sample":["Water is vital for all living things."],"Shell":["Shells protect animal bodies."]};
+const sampleTypes=["Wildflower","Quartz Rock","Water Sample","Shell"];
+const samples = [];
+const researchLog=[];
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x66c6ff);
+const camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,0.1,1000);
+const renderer=new THREE.WebGLRenderer();renderer.setSize(window.innerWidth,window.innerHeight);document.body.appendChild(renderer.domElement);
 
-    const renderer = new THREE.WebGLRenderer({antialias: true});
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+// ---- Smoother Perlin Terrain ----
+const LAND_SIZE = 100, DETAIL = 48, simplex = new PerlinNoise(), groundVerts=[];
+const geom = new THREE.PlaneGeometry(LAND_SIZE, LAND_SIZE, DETAIL, DETAIL); geom.rotateX(-Math.PI/2);
+for(let i=0;i<geom.attributes.position.count;i++){
+  const v=geom.attributes.position, x=v.getX(i),z=v.getZ(i),y=simplex.noise2D(x*0.04,z*0.04)*1.5 + simplex.noise2D(x*0.12,z*0.12)*0.5;
+  v.setY(i,y); groundVerts.push(y);
+}
+const ground = new THREE.Mesh(geom, new THREE.MeshPhongMaterial({color:0x32d97d,flatShading:true}));
+ground.position.y=0;scene.add(ground);
 
-    // Sunlight and ambient
-    scene.add(new THREE.HemisphereLight(0xe6faff, 0xcfecff, 0.55));
-    var dirLight = new THREE.DirectionalLight(0xfffaf3, 1.1);
-    dirLight.position.set(40,100,42);
-    scene.add(dirLight);
+// Helper: get Y for any (x,z)
+function getTerrainHeight(x, z){
+  let fx = Math.max(-LAND_SIZE/2, Math.min(LAND_SIZE/2-1, x)),
+      fz = Math.max(-LAND_SIZE/2, Math.min(LAND_SIZE/2-1, z));
+  let rx = (fx+LAND_SIZE/2)/(LAND_SIZE), rz = (fz+LAND_SIZE/2)/(LAND_SIZE);
+  let pi = Math.floor(rx*DETAIL), pj = Math.floor(rz*DETAIL);
+  let idx = pi + pj*(DETAIL+1);
+  return groundVerts[idx];
+}
+// --- scientist/player (better model)
+const scientist = new THREE.Group();
+const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1, 8), new THREE.MeshPhongMaterial({color:0xffbc72}));
+body.position.y = 0.5; scientist.add(body);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), new THREE.MeshPhongMaterial({color:0xffedd3}));
+head.position.y = 1.2; scientist.add(head);
+const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8), new THREE.MeshPhongMaterial({color:0xffe167}));
+armL.position.set(-0.35, 0.8, 0); armL.rotation.z = Math.PI/6; scientist.add(armL);
+const armR = armL.clone(); armR.position.x = 0.35; armR.rotation.z = -Math.PI/6; scientist.add(armR);
+const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8), new THREE.MeshPhongMaterial({color:0xDCD9DF}));
+legL.position.set(-0.2, -0.3, 0); scientist.add(legL);
+const legR = legL.clone(); legR.position.x = 0.2; scientist.add(legR);
+let sx=0,sz=0; // scientist's world coordinates
+let sy=getTerrainHeight(sx,sz)+1;
+scientist.position.set(sx,sy,sz);scene.add(scientist);
+scene.add(new THREE.HemisphereLight(0xffffff,0x449933,1));
+const sun=new THREE.DirectionalLight(0xffffcc,.85);sun.position.set(6,10,8);scene.add(sun);
+// --- Collectibles on terrain
+function randomPos(){let r=24+Math.random()*30,a=Math.random()*Math.PI*2;return[Math.cos(a)*r,Math.sin(a)*r];}
+for(let i=0;i<10;i++){
+  let t=sampleTypes[i%sampleTypes.length],[x,z]=randomPos();
+  let y=getTerrainHeight(x,z)+1,mesh;
+  if(t=="Wildflower") mesh=new THREE.Mesh(new THREE.ConeGeometry(0.5,1.2,7),new THREE.MeshPhongMaterial({color:0xe2ff8c}));
+  else if(t=="Quartz Rock") mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(0.7),new THREE.MeshPhongMaterial({color:0xbbbaf2}));
+  else if(t=="Water Sample") mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,0.7,18),new THREE.MeshPhongMaterial({color:0x6dcfff}));
+  else mesh=new THREE.Mesh(new THREE.TorusGeometry(0.45,0.16,12,22,Math.PI),new THREE.MeshPhongMaterial({color:0xf7fad0}));
+  mesh.position.set(x,y,z);
+  mesh.userData={type:t,collected:false,baseY:mesh.position.y};
+  scene.add(mesh); samples.push(mesh);
+}
 
-    // LAND
-    const LAND_SIZE = 200;
-    const groundGeo = new THREE.BoxGeometry(LAND_SIZE, 1, LAND_SIZE);
-    const groundMat = new THREE.MeshPhongMaterial({color: 0x7bd672});
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.position.y = -1.5;
-    scene.add(ground);
+// --- Clouds ---
+const clouds=[];function addCloud(x,z,y=18,n=5){const cloud=new THREE.Group();for(let i=0;i<n;++i){let sph=new THREE.Mesh(new THREE.SphereGeometry(2.1+Math.random()*1.4,12,10),new THREE.MeshPhongMaterial({color:0xffffff}));sph.position.set((Math.random()-.5)*4.5,(Math.random()-.5)*2.7,(Math.random()-.5)*2.5);cloud.add(sph);}cloud.position.set(x,y,z);scene.add(cloud);clouds.push(cloud);}
+for(let i=0;i<7;i++){let angle=Math.PI*2*(i/7),rad=32+Math.random()*24;addCloud(Math.cos(angle)*rad,Math.sin(angle)*rad,19+Math.random()*7,3+Math.floor(Math.random()*3));}
 
-    // SCIENTIST PLAYER: geometric, colorful
-    const scientist = new THREE.Group();
-    function buildScientist() {
-      const shoeL = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.09, 14, 18, Math.PI), new THREE.MeshPhongMaterial({color:"#71789C"}));
-      shoeL.position.set(-0.22, 0.11,-0.06); shoeL.rotation.x=Math.PI/2;
-      const shoeR = shoeL.clone(); shoeR.position.x=0.22; scientist.add(shoeL,shoeR);
+// --- Input, Camera, UI ---
+let vy=0,inAir=false,keyState={}, az = 0, el = 0.18;
+let stamina = 100, staminaBar = document.querySelector('#stamina .bar');
+const logElem=document.getElementById('samples'),scoreElem=document.getElementById('score'),factDiv=document.getElementById('fact');
+const compassArrow = document.getElementById('compass-arrow');
+function updateLog(){logElem.innerHTML=researchLog.map(x=>'<li>'+x+'</li>').join('');}
+function showFact(txt){factDiv.textContent=txt;factDiv.style.display='block';setTimeout(()=>factDiv.style.display='none',2400);}
+let lockInstruct=document.getElementById('lock-instruct'),locked=false;
+function lockEvent(){locked=document.pointerLockElement===renderer.domElement;lockInstruct.style.display=locked?'none':'block';}
+document.body.addEventListener('click',()=>{renderer.domElement.requestPointerLock();});
+document.addEventListener('pointerlockchange',lockEvent);lockEvent();
+document.addEventListener('mousemove',function(e){
+  if(!locked)return;
+  az-=e.movementX*0.0022;
+  el-=e.movementY*0.0022;
+  el=Math.max(-Math.PI/4,Math.min(Math.PI/4,el));
+});
+document.addEventListener('keydown',function(e){
+  if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keyState['Shift'] = true;
+  else keyState[e.code] = true;
+});
+document.addEventListener('keyup',function(e){
+  if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keyState['Shift'] = false;
+  else keyState[e.code] = false;
+});
+let skyTime=0;
+function animate(){
+  skyTime += 0.008;
+  let dayCol = new THREE.Color(0x66c6ff), eveCol = new THREE.Color(0xfadc8f);
+  let t = Math.max(0,Math.min(1,0.5 + 0.5*Math.sin(skyTime/15)));
+  scene.background = dayCol.clone().lerp(eveCol, t);
+  for(let j=0;j<clouds.length;j++){
+    let cloud=clouds[j];
+    cloud.position.x += Math.sin(0.25*skyTime+j)*0.008;
+    cloud.position.z += Math.cos(0.18*skyTime-j)*0.012;
+    cloud.position.x = Math.max(-200,Math.min(200,cloud.position.x));
+    cloud.position.z = Math.max(-200,Math.min(200,cloud.position.z));
+  }
+  // Controls relative to view (fixed direction)
+  let baseSpeed = 0.16;
+  let speed = (keyState['Shift'] && stamina > 0) ? baseSpeed * 1.8 : baseSpeed;
+  let fw = new THREE.Vector3(Math.sin(az),0,Math.cos(az)).negate(); // Negate for correct forward
+  let rt = new THREE.Vector3(Math.cos(az),0,-Math.sin(az));
+  let dir = new THREE.Vector3();
+  if(keyState["KeyW"])dir.add(fw);
+  if(keyState["KeyS"])dir.sub(fw);
+  if(keyState["KeyA"])dir.sub(rt);
+  if(keyState["KeyD"])dir.add(rt);
+  if(dir.length()>0){
+    dir.normalize().multiplyScalar(speed);
+    sx+=dir.x;sz+=dir.z;
+    if(keyState['Shift'] && stamina > 0) stamina = Math.max(0, stamina - 0.5);
+  } else if(stamina < 100) stamina = Math.min(100, stamina + 0.2);
+  staminaBar.style.width = stamina + '%';
+  staminaBar.classList.toggle('low', stamina < 30);
+  // Invisible walls: clamp to land boundaries
+  sx = Math.max(-LAND_SIZE/2, Math.min(LAND_SIZE/2, sx));
+  sz = Math.max(-LAND_SIZE/2, Math.min(LAND_SIZE/2, sz));
+  // Maintain on terrain
+  sy = getTerrainHeight(sx, sz)+1;
+  // Jump! (higher and faster fall)
+  if(!inAir&&keyState['Space']){vy=1.0;inAir=true;}
+  if(inAir){vy-=0.035;sy+=vy;if(sy<=getTerrainHeight(sx,sz)+1){sy=getTerrainHeight(sx,sz)+1;vy=0;inAir=false;}}
+  scientist.position.set(sx,sy,sz);
+  // Camera
+  let r = 15, y = sy + 5 + 5*Math.sin(el), x = sx + r*Math.sin(az), z = sz + r*Math.cos(az);
+  camera.position.set(x, y, z);camera.lookAt(sx, sy+1, sz);
+  // Samples = animate, stick to terrain, collect
+  samples.forEach((m,i)=>{
+    m.position.y=getTerrainHeight(m.position.x,m.position.z)+1+Math.sin(Date.now()/450+i)*.21;
+    m.rotation.y+=.016;
+    if(!m.userData.collected&&scientist.position.distanceTo(m.position)<2){
+      m.material.emissive=new THREE.Color(0x33ff99);
+      if(keyState["KeyE"]){m.userData.collected=true;researchLog.push(m.userData.type);updateLog();scoreElem.textContent='Samples: '+researchLog.length;showFact(facts[m.userData.type][0]);}
+    }else{m.material.emissive?.setRGB(0,0,0);}
+    m.visible=!m.userData.collected;
+  });
+  // Compass rotation
+  compassArrow.style.transform = `rotate(${ -az }rad)`;
+  renderer.render(scene,camera);requestAnimationFrame(animate);
+}
+updateLog();animate();
 
-      const legMat = new THREE.MeshPhongMaterial({color: "#DCD9DF"});
-      const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.42,8), legMat); legL.position.set(-0.22,0.37,0);
-      const legR = legL.clone(); legR.position.x=0.22; scientist.add(legL, legR);
+// Compass labels
+const compass = document.getElementById('compass');
+['N', 'E', 'S', 'W'].forEach((dir, i) => {
+  const el = document.createElement('div');
+  el.className = 'dir';
+  el.textContent = dir;
+  const angle = i * 90 * (Math.PI / 180);
+  const dist = 34;
+  el.style.left = (40 + dist * Math.sin(angle)) + 'px';
+  el.style.top = (40 - dist * Math.cos(angle)) + 'px';
+  compass.appendChild(el);
+});
 
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.64, 1.0, 0.42), new THREE.MeshPhongMaterial({color: "#ffbc72"})); body.position.y = 0.97; scientist.add(body);
-      const tie = new THREE.Mesh(new THREE.ConeGeometry(0.09,0.22,7), new THREE.MeshPhongMaterial({color: "#3fa7f5"})); tie.position.set(0,1.35,0.21); scientist.add(tie);
+// How to Play fade out
+const instructions = document.getElementById('instructions');
+setTimeout(() => instructions.style.opacity = '0', 10000);
 
-      const should = new THREE.Mesh(new THREE.SphereGeometry(0.36,12,8), new THREE.MeshPhongMaterial({color:"#ffc6b9"}));
-      should.scale.set(1.13,0.51,0.67); should.position.set(0,1.5,0); scientist.add(should);
+// Audio setup
+let audioContext, ambientSoundBuffer, footstepSoundBuffer, ambientSource;
+document.body.addEventListener('click', async () => {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    await loadSounds();
+    playAmbient();
+  }
+}, {once: true});
 
-      const armMat = new THREE.MeshPhongMaterial({color: "#ffe167"});
-      const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.52, 8, 14), armMat);
-      armL.position.set(-0.46,1.26,0); armL.rotation.z = Math.PI/10;
-      const armR = armL.clone(); armR.position.x = 0.46; armR.rotation.z=-Math.PI/10; scientist.add(armL, armR);
+async function loadSounds() {
+  const ambientResponse = await fetch('https://cdn.pixabay.com/download/audio/2021/08/04/audio_ace08d4649.mp3?filename=ambient-nature-10331.mp3');
+  const ambientData = await ambientResponse.arrayBuffer();
+  ambientSoundBuffer = await audioContext.decodeAudioData(ambientData);
 
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.36,18,16), new THREE.MeshPhongMaterial({color: "#ffedd3"})); head.position.y = 1.98; scientist.add(head);
+  const footstepResponse = await fetch('https://cdn.pixabay.com/download/audio/2021/08/04/audio_7fc2e0359b.mp3?filename=footstep-on-grass-15820.mp3');
+  const footstepData = await footstepResponse.arrayBuffer();
+  footstepSoundBuffer = await audioContext.decodeAudioData(footstepData);
+}
 
-      const hatB = new THREE.Mesh(new THREE.CylinderGeometry(0.37,0.37,0.08,18), new THREE.MeshPhongMaterial({color:'#35477d'})); hatB.position.set(0,2.22,0);
-      const hatT = new THREE.Mesh(new THREE.CylinderGeometry(0.24,0.24,0.25,15), new THREE.MeshPhongMaterial({color:'#1a2238'})); hatT.position.set(0,2.36,0);
-      scientist.add(hatB, hatT);
-    }
-    buildScientist();
-    scientist.position.set(0,0,0);
-    scene.add(scientist);
+function playAmbient() {
+  ambientSource = audioContext.createBufferSource();
+  ambientSource.buffer = ambientSoundBuffer;
+  ambientSource.loop = true;
+  ambientSource.connect(audioContext.destination);
+  ambientSource.start();
+}
 
-    // --- WHITE OPAQUE CLOUDS ---
-    function addCloud(x, z, y=31, n=5) {
-      const cloud = new THREE.Group();
-      for(let i=0;i<n;++i){
-        const sph = new THREE.Mesh(
-          new THREE.SphereGeometry(2.1 + Math.random()*1.7, 20,16),
-          new THREE.MeshPhongMaterial({
-            color:0xffffff,
-            transparent: false,
-            opacity: 1,
-            shininess: 20
-          })
-        );
-        sph.position.x = (Math.random()-0.5)*3.8;
-        sph.position.z = (Math.random()-0.5)*2.9;
-        sph.position.y = (Math.random()-0.6)*2.7;
-        cloud.add(sph);
-      }
-      cloud.position.set(x,y,z);
-      scene.add(cloud);
-    }
-    [
-      [10, 23], [-20, 40], [-60, -15], [70, -70],
-      [-40, 100], [60, 100], [-100, -100]
-    ].forEach(([x,z])=>addCloud(x,z,31 + Math.random()*8, 4 + Math.floor(Math.random()*3)));
+let lastStepTime = 0;
+function tryPlayFootstep(time) {
+  if (audioContext && time - lastStepTime > 400 && (keyState['KeyW'] || keyState['KeyA'] || keyState['KeyS'] || keyState['KeyD'])) {
+    lastStepTime = time;
+    const source = audioContext.createBufferSource();
+    source.buffer = footstepSoundBuffer;
+    source.connect(audioContext.destination);
+    source.start();
+  }
+}
 
-    // --- SAMPLES (unchanged, still fun and randomized) ---
-    function makeFlower(x,z) {
-      const group = new THREE.Group();
-      const stem = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.09, 0.09, 0.82, 8),
-        new THREE.MeshPhongMaterial({color: 0x22991e}));
-      stem.position.y = 0.41; group.add(stem);
-      const blossom = new THREE.Mesh(
-        new THREE.SphereGeometry(0.26, 12, 10),
-        new THREE.MeshPhongMaterial({color: 0xffbae8}));
-      blossom.position.set(0,0.87,0); group.add(blossom);
-      const center = new THREE.Mesh(
-        new THREE.SphereGeometry(0.15, 12, 10),
-        new THREE.MeshPhongMaterial({ color: 0xffd000}));
-      center.position.set(0,1,0); group.add(center);
-      group.userData = {label: "Wildflower", collected: false};
-      group.position.set(x, 0.05, z);
-      return group;
-    }
-    function makeRock(x,z) {
-      const mesh = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(0.78,0),
-        new THREE.MeshPhongMaterial({ color: 0xaea7cc, flatShading:true}));
-      mesh.rotation.set(0.2,1,0);
-      mesh.userData = {label: "Quartz Rock", collected:false};
-      mesh.position.set(x,0.46,z);
-      return mesh;
-    }
-    function makeMoss(x,z) {
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.66, 14, 8),
-        new THREE.MeshPhongMaterial({color: 0x77edd4}));
-      mesh.scale.y = 0.28;
-      mesh.userData = {label: "Moss Patch", collected:false};
-      mesh.position.set(x,0.18,z);
-      return mesh;
-    }
-    function makeWaterSample(x,z) {
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.22,0.23,0.55,14),
-        new THREE.MeshPhongMaterial({color: 0x6dcfff, transparent:true, opacity: 0.66}));
-      mesh.userData = {label:"Water Sample",collected:false};
-      mesh.position.set(x,0.36,z);
-      return mesh;
-    }
-    function makeSoilCore(x,z) {
-      const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.34,0.36,0.9,10),
-        new THREE.MeshPhongMaterial({color: 0xc99e6a}));
-      mesh.userData = {label:"Soil Core",collected:false};
-      mesh.position.set(x,0.45,z);
-      return mesh;
-    }
-    function makeTreeCone(x, z) {
-      const group = new THREE.Group();
-      const cone = new THREE.Mesh(
-        new THREE.ConeGeometry(0.32, 0.8, 12),
-        new THREE.MeshPhongMaterial({ color: 0xbd6856 }));
-      cone.position.y = 0.4; group.add(cone);
-      group.userData = {label: "Tree Cone", collected: false};
-      group.position.set(x, 0.05, z);
-      return group;
-    }
-    function makeShell(x, z) {
-      const mesh = new THREE.Mesh(
-        new THREE.TorusGeometry(0.36, 0.14, 12, 28, Math.PI),
-        new THREE.MeshPhongMaterial({ color: 0xf7fad0 }));
-      mesh.rotation.x = Math.PI/2;
-      mesh.userData = {label: "Shell", collected: false};
-      mesh.position.set(x,0.32,z);
-      return mesh;
-    }
-    function makeFern(x, z) {
-      const mesh = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.16, 0.69, 4, 8),
-        new THREE.MeshPhongMaterial({ color: 0x70e360 }));
-      mesh.rotation.x = Math.PI/5;
-      mesh.userData = {label: "Fern", collected: false};
-      mesh.position.set(x,0.55,z);
-      return mesh;
-    }
-    function makeLeafFossil(x, z) {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.74, 0.08, 0.5),
-        new THREE.MeshPhongMaterial({ color: 0xd4cbaa }));
-      mesh.userData = {label: "Leaf Fossil", collected: false};
-      mesh.position.set(x,0.08,z);
-      return mesh;
-    }
-    // Types and randomization
-    const collectibleTypes = [
-      {count: 2, maker: makeRock},
-      {count: 2, maker: makeFlower},
-      {count: 2, maker: makeWaterSample},
-      {count: 2, maker: makeMoss},
-      {count: 2, maker: makeSoilCore},
-      {count: 2, maker: makeTreeCone},
-      {count: 2, maker: makeShell},
-      {count: 2, maker: makeFern},
-      {count: 2, maker: makeLeafFossil}
-    ];
-    // Helper: random position within a ring (minRadius,maxRadius) from (0,0)
-    function randomPosition(minR, maxR) {
-      const rad = minR + Math.random() * (maxR - minR);
-      const angle = Math.random() * Math.PI * 2;
-      return [
-        Math.round(Math.cos(angle) * rad),
-        Math.round(Math.sin(angle) * rad)
-      ];
-    }
-
-    const samples = [];
-    // 1st half: close (20-50 units), 2nd half: farther (60-120 units)
-    collectibleTypes.forEach(t=>{
-      for(let i=0;i<t.count;i++){
-        const isClose = (i % 2 == 0);
-        const [x,z] = isClose ? randomPosition(20,48) : randomPosition(60,120);
-        samples.push(t.maker(x,z));
-      }
-    });
-    for (const s of samples) scene.add(s);
-
-    // --- CAMERA + POINTER LOCK ---
-    let pitchObject = new THREE.Object3D();
-    pitchObject.add(camera);
-    let yawObject = new THREE.Object3D();
-    yawObject.position.y = 1.57;
-    yawObject.add(pitchObject);
-    scene.add(yawObject);
-
-    function resetCameraToPlayer() {
-      yawObject.position.set(scientist.position.x, 1.57, scientist.position.z);
-    }
-    resetCameraToPlayer();
-
-    let isLocked=false;
-    let rotationSpeed = 0.0022;
-
-    function onMouseMove( event ) {
-      if (!isLocked) return;
-      yawObject.rotation.y -= event.movementX * rotationSpeed;
-      pitchObject.rotation.x -= event.movementY * rotationSpeed;
-      pitchObject.rotation.x = Math.max( -Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
-    }
-    document.body.addEventListener('click', function(){
-      if(!isLocked) renderer.domElement.requestPointerLock();
-    });
-    document.addEventListener('pointerlockchange', ()=>{
-      isLocked = document.pointerLockElement === renderer.domElement;
-      document.getElementById('lock-instruct').style.display = isLocked?"none":"block";
-    });
-    renderer.domElement.addEventListener('mousemove', onMouseMove);
-    if (!isLocked) document.getElementById('lock-instruct').style.display = 'block';
-
-    let keys = {}, jumpKeyDown = false;
-    document.addEventListener("keydown", e => { keys[e.code]=true; if(e.code==="Space") jumpKeyDown=true; });
-    document.addEventListener("keyup",   e => { keys[e.code]=false; if(e.code==="Space") jumpKeyDown=false; });
-
-    window.addEventListener('resize', ()=>{
-      camera.aspect=window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    const sampleListElem = document.getElementById("samples");
-    let researchLog = [];
-    function updateLog(){
-      sampleListElem.innerHTML = "";
-      for(const n of researchLog)
-        sampleListElem.innerHTML += "<li>"+n+"</li>";
-      if(researchLog.length === 0) sampleListElem.innerHTML = "<i>No samples yet</i>";
-    }
-    updateLog();
-
-    // --- PHYSICS ---
-    let vy = 0, inAir = false, GRAVITY = 0.016;
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // --- PLAYER MOVEMENT (WASD, relative to camera yaw) ---
-      let speed = 0.15, jumpHeight = 0.31;
-      let move = new THREE.Vector3();
-      if(keys["KeyW"]) move.z -= 1;
-      if(keys["KeyS"]) move.z += 1;
-      if(keys["KeyA"]) move.x -= 1;
-      if(keys["KeyD"]) move.x += 1;
-      if(move.length()>0){
-        move.normalize();
-        const yaw = yawObject.rotation.y;
-        let forward = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
-        let right = new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
-        let moveDir = new THREE.Vector3();
-        moveDir.addScaledVector(forward, move.z);
-        moveDir.addScaledVector(right, move.x);
-        moveDir.normalize();
-        moveDir.multiplyScalar(speed);
-        let next = scientist.position.clone().add(moveDir);
-        const limit = LAND_SIZE/2-1.5;
-        if(Math.abs(next.x) < limit && Math.abs(next.z) < limit) {
-          scientist.position.x = next.x;
-          scientist.position.z = next.z;
-          yawObject.position.x = next.x;
-          yawObject.position.z = next.z;
-        }
-      }
-
-      scientist.rotation.y = yawObject.rotation.y;
-
-      // --- JUMPING + GRAVITY ---
-      if(!inAir && jumpKeyDown) {
-        vy = 0.33;
-        inAir = true;
-      }
-      if(inAir) {
-        vy -= GRAVITY;
-        scientist.position.y += vy;
-        yawObject.position.y = scientist.position.y + 1.57;
-        // Land on ground
-        if(scientist.position.y <= 0){
-          scientist.position.y = 0;
-          yawObject.position.y = 1.57;
-          inAir = false;
-          vy = 0;
-        }
-      }
-
-      // --- SAMPLE INTERACTION ---
-      for(let m of samples){
-        const sY = (m.position ? m.position.y : 0) + 0.14;
-        const distance = scientist.position.clone().setY(0).distanceTo(m.position ? m.position.clone().setY(0) : new THREE.Vector3());
-        if(!m.userData.collected && 
-          (distance < 1.8) && Math.abs((scientist.position.y||0) - (sY)) < 1.1 ) {
-          m.children?.forEach(p=>p.material.emissive?.setHex(0xffea8a));
-          m.material?.emissive?.setHex(0xffea8a);
-          if(keys["KeyE"]){
-            m.userData.collected=true;
-            researchLog.push(m.userData.label);
-            m.visible = false;
-            updateLog();
-          }
-        } else {
-          m.children?.forEach(p=>p.material.emissive?.setHex(0x0));
-          m.material?.emissive?.setHex(0x0);
-        }
-      }
-
-      camera.position.set(0, 2.2, 10);
-      camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
-    }
-    animate();
+// Integrate into animate loop
+const originalAnimate = animate;
+animate = function() {
+  tryPlayFootstep(performance.now());
+  originalAnimate();
+};
