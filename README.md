@@ -57,7 +57,7 @@ No installation or dependencies needed—it's a self-contained HTML file with em
 
 ## Credits
 
-- Developed by [Your Name] with assistance from Perplexity AI.
+- Developed by Dixon Simon with assistance from Perplexity AI.
 - Three.js library: [threejs.org](https://threejs.org)
 - Audio assets: Free from Pixabay (nature ambient and grass footsteps).
 - Inspired by environmental education projects like gamified platforms for schools.
