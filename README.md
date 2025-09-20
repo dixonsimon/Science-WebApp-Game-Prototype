@@ -45,16 +45,6 @@ This project was developed as a prototype for gamified environmental education, 
 - Find and collect as many samples as you like—some are nearby, others require venturing farther.
 - Refresh the page for a new random layout!
 
-## Screenshots
-
-![Exploration View](exploration.png)  
-*Exploring the field and approaching a sample.*
-
-![Research Log](research-log.png)  
-*The in-game research log with collected items.*
-
-*(Replace these placeholders with actual screenshots for better visualization.)*
-
 ## Technical Details
 
 - **Tech Stack**: HTML5, JavaScript, Three.js (via CDN).
