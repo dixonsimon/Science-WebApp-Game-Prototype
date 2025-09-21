@@ -142,8 +142,8 @@ function animate(){
   // Maintain on terrain
   sy = getTerrainHeight(sx, sz)+1;
   // Jump! (higher and faster fall)
-  if(!inAir&&keyState['Space']){vy=1.0;inAir=true;}
-  if(inAir){vy-=0.035;sy+=vy;if(sy<=getTerrainHeight(sx,sz)+1){sy=getTerrainHeight(sx,sz)+1;vy=0;inAir=false;}}
+  if(!inAir&&keyState['Space']){vy=3.0;inAir=true;}
+  if(inAir){vy-=0.075;sy+=vy;if(sy<=getTerrainHeight(sx,sz)+1){sy=getTerrainHeight(sx,sz)+1;vy=0;inAir=false;}}
   scientist.position.set(sx,sy,sz);
   // Camera
   let r = 15, y = sy + 5 + 5*Math.sin(el), x = sx + r*Math.sin(az), z = sz + r*Math.cos(az);
